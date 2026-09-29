@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>کار های من</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+</head>
+<body>
+    <div class="part1">
+        <h1>کارهای من</h1>
+        <div class="sub">یاد آوری کاراتو به من بسپار😉</div>
+
+        <form id="form">
+            <input type="text" id="input" placeholder="یک کار جدید بنویس..." autocomplete="off">
+            <button type="submit" class="add">افزودن</button>
+            <div class="due-row" role="group" aria-label="زمان یادآوری (اختیاری)">
+                <span class="due-label">زمان یادآوری (اختیاری)</span>
+                <select id="dY" aria-label="سال"></select>
+                <select id="dM" aria-label="ماه"></select>
+                <select id="dD" aria-label="روز"></select>
+                <select id="dH" aria-label="ساعت"></select>
+                <select id="dI" aria-label="دقیقه"></select>
+                <button type="button" id="dueClear" class="clear" aria-label="پاک کردن زمان" title="پاک کردن زمان">✕</button>
+            </div>
+        </form>
+
+        <div class="filters">
+            <button data-f="all" class="active">همه</button>
+            <button data-f="active">انجام نشده</button>
+            <button data-f="done">انجام شده</button>
+        </div>
+
+        <ul id="list"></ul>
+        <div class="count" id="count"></div>
+    </div>
+    <div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+let tasks = [];
+let filter = 'all';
+
+function load() {
+  try { tasks = JSON.parse(localStorage.getItem('todo-tasks') || '[]'); }
+  catch(e) { tasks = []; }
+}
+function save() {
+  try { localStorage.setItem('todo-tasks', JSON.stringify(tasks)); } catch(e) {}
+}
+
+// جلوگیری از اجرای کد داخل متن کاربر
+function esc(s) {
+  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// نمایش تاریخ و ساعت به صورت شمسی، بر اساس ساعت گوشی
+function formatDue(ms) {
+  return new Date(ms).toLocaleString('fa-IR-u-ca-persian', { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+// ---- انتخاب تاریخ و ساعت به صورت شمسی ----
+const FA_MONTHS = ['فروردین','اردیبهشت','خرداد','تیر','مرداد','شهریور','مهر','آبان','آذر','دی','بهمن','اسفند'];
+const faNum = n => String(n).replace(/\d/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]);
+
+// تبدیل میلادی به شمسی با خود مرورگر (هماهنگ با تاریخ‌هایی که نمایش داده می‌شود)
+const jalFmt = new Intl.DateTimeFormat('en-US-u-ca-persian-nu-latn', { year: 'numeric', month: 'numeric', day: 'numeric' });
+function jalOf(date) {
+  const p = jalFmt.formatToParts(date);
+  const get = k => parseInt(p.find(x => x.type === k).value, 10);
+  return { jy: get('year'), jm: get('month'), jd: get('day') };
+}
+const jKey = j => j.jy * 10000 + j.jm * 100 + j.jd;
+
+// تبدیل شمسی به میلادی: حدس اولیه و بعد تنظیم روز به روز
+function gregOf(jy, jm, jd) {
+  const c = new Date(jy + 621, 2, 21 + Math.round((jm - 1) * 30.44) + jd - 1, 12);
+  const target = jy * 10000 + jm * 100 + jd;
+  for (let i = 0; i < 10 && jKey(jalOf(c)) < target; i++) c.setDate(c.getDate() + 1);
+  for (let i = 0; i < 10 && jKey(jalOf(c)) > target; i++) c.setDate(c.getDate() - 1);
+  return c;
+}
+function daysInJalaliMonth(jy, jm) {
+  if (jm <= 6) return 31;
+  if (jm <= 11) return 30;
+  return jalOf(gregOf(jy, 12, 30)).jd === 30 ? 30 : 29;
+}
+function jalaliToMs(jy, jm, jd, h, min) {
+  const g = gregOf(jy, jm, jd);
+  return new Date(g.getFullYear(), g.getMonth(), g.getDate(), h, min).getTime();
+}
+
+const pk = {};
+function initPicker() {
+  ['Y', 'M', 'D', 'H', 'I'].forEach(k => pk[k] = document.getElementById('d' + k));
+  const opt = (v, t) => { const o = document.createElement('option'); o.value = v; o.textContent = t; return o; };
+  const now = jalOf(new Date());
+  pk.Y.append(opt('', 'سال'));
+  for (let y = now.jy; y <= now.jy + 3; y++) pk.Y.append(opt(y, faNum(y)));
+  pk.M.append(opt('', 'ماه'));
+  FA_MONTHS.forEach((m, i) => pk.M.append(opt(i + 1, m)));
+  pk.D.append(opt('', 'روز'));
+  for (let d = 1; d <= 31; d++) pk.D.append(opt(d, faNum(d)));
+  pk.H.append(opt('', 'ساعت'));
+  for (let h = 0; h < 24; h++) pk.H.append(opt(h, faNum(String(h).padStart(2, '0'))));
+  pk.I.append(opt('', 'دقیقه'));
+  for (let m = 0; m < 60; m++) pk.I.append(opt(m, faNum(String(m).padStart(2, '0'))));
+  Object.values(pk).forEach(s => s.addEventListener('change', onPickerChange));
+  document.getElementById('dueClear').addEventListener('click', resetDue);
+}
+
+// با انتخاب هر بخش، بخش‌های خالی با ساعت بعدی پر می‌شوند
+function onPickerChange() {
+  const d = new Date();
+  d.setMinutes(0, 0, 0);
+  d.setHours(d.getHours() + 1);
+  const j = jalOf(d);
+  if (!pk.Y.value) pk.Y.value = j.jy;
+  if (!pk.M.value) pk.M.value = j.jm;
+  if (!pk.D.value) pk.D.value = j.jd;
+  if (!pk.H.value) pk.H.value = d.getHours();
+  if (!pk.I.value) pk.I.value = 0;
+  const max = daysInJalaliMonth(+pk.Y.value, +pk.M.value);
+  [...pk.D.options].forEach(o => { if (o.value) o.disabled = +o.value > max; });
+  if (+pk.D.value > max) pk.D.value = max;
+}
+
+function readDue() {
+  const vals = Object.values(pk).map(s => s.value);
+  if (vals.every(v => v === '')) return null;
+  if (vals.some(v => v === '')) onPickerChange();
+  return jalaliToMs(+pk.Y.value, +pk.M.value, +pk.D.value, +pk.H.value, +pk.I.value);
+}
+
+function resetDue() {
+  Object.values(pk).forEach(s => { s.value = ''; });
+  [...pk.D.options].forEach(o => { o.disabled = false; });
+}
+
+// ---- اعلان‌های اپ موبایل (Capacitor) ----
+// داخل مرورگر همه‌ی این بخش‌ها غیرفعال است و برنامه مثل قبل کار می‌کند
+const LN = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications;
+const isNative = !!(LN && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+let exactAsked = false;
+
+// شناسه‌ی اعلان باید عدد ۳۲ بیتی باشد
+const notifId = task => Number(String(task.id).slice(-9));
+
+async function nativeSetup() {
+  if (!isNative) return;
+  try { await LN.requestPermissions(); } catch(e) {}
+  // کانال با اهمیت بالا: اعلان با صدا و لرزش و به‌صورت پاپ‌آپ (فقط اندروید)
+  try {
+    await LN.createChannel({
+      id: 'reminders', name: 'یادآوری کارها',
+      importance: 5, visibility: 1, vibration: true
+    });
+  } catch(e) {}
+}
+
+async function scheduleNative(task) {
+  if (!isNative || !task.due || task.done || task.due <= Date.now()) return;
+  // اندروید ۱۲ به بالا: بدون مجوز «آلارم دقیق»، اعلان ممکن است با تأخیر بیاید
+  if (!exactAsked) {
+    exactAsked = true;
+    try {
+      const s = await LN.checkExactNotificationSetting();
+      if (s.exact_alarm !== 'granted') await LN.changeExactNotificationSetting();
+    } catch(e) {}
+  }
+  try {
+    await LN.schedule({ notifications: [{
+      id: notifId(task),
+      title: 'یادآوری',
+      body: task.text,
+      channelId: 'reminders',
+      schedule: { at: new Date(task.due), allowWhileIdle: true }
+    }] });
+  } catch(e) {}
+}
+
+async function cancelNative(task) {
+  if (!isNative) return;
+  try { await LN.cancel({ notifications: [{ id: notifId(task) }] }); } catch(e) {}
+}
+
+function render() {
+  const now = Date.now();
+  const list = document.getElementById('list');
+  const visible = tasks.filter(t => filter === 'all' ? true : filter === 'done' ? t.done : !t.done);
+  list.innerHTML = '';
+  if (visible.length === 0) {
+    list.innerHTML = `<li style="border:none;"><div class="empty" style="width:100%;">${tasks.length === 0 ? 'هنوز کاری اضافه نکردی' : 'چیزی اینجا نیست'}</div></li>`;
+  } else {
+    visible.forEach(t => {
+      const li = document.createElement('li');
+      const overdue = t.due && !t.done && t.due <= now;
+      li.className = (t.done ? 'done ' : '') + (overdue ? 'overdue' : '');
+      const dueHtml = t.due ? `<small class="due">${overdue ? 'گذشته: ' : '⏰ '}${formatDue(t.due)}</small>` : '';
+      li.innerHTML = `
+        <input type="checkbox" ${t.done ? 'checked' : ''} data-id="${t.id}">
+        <span class="txt">${esc(t.text)}${dueHtml}</span>
+        ${t.due ? `<button class="cal" data-id="${t.id}" aria-label="افزودن به تقویم گوشی" title="افزودن به تقویم">📅</button>` : ''}
+        <button class="edit" data-id="${t.id}" aria-label="ویرایش">✎</button>
+        <button class="del" data-id="${t.id}" aria-label="حذف">✕</button>
+      `;
+      list.appendChild(li);
+    });
+  }
+  const doneCount = tasks.filter(t => t.done).length;
+  document.getElementById('count').textContent = `${doneCount} از ${tasks.length} کار انجام شده`;
+}
+
+// ---- یادآوری ----
+let toastTimer;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 10000);
+}
+
+// ---- صدا و لرزش ----
+let audioCtx = null, ringTimer = null;
+
+// مرورگرها بدون تعامل کاربر صدا را بلاک می‌کنند؛ با اولین لمس فعالش می‌کنیم
+function unlockAudio() {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  } catch(e) {}
+}
+['click', 'touchstart', 'keydown'].forEach(ev => document.addEventListener(ev, unlockAudio, { passive: true }));
+
+function beep() {
+  if (!audioCtx) return;
+  try {
+    const t0 = audioCtx.currentTime;
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = 'square';
+    o.frequency.value = 880;
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(0.25, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.25);
+    o.connect(g);
+    g.connect(audioCtx.destination);
+    o.start(t0);
+    o.stop(t0 + 0.3);
+  } catch(e) {}
+}
+
+function stopRing() {
+  clearInterval(ringTimer);
+  ringTimer = null;
+  if (navigator.vibrate) navigator.vibrate(0);
+}
+
+function startRing() {
+  stopRing();
+  let n = 0;
+  const tick = () => {
+    beep();
+    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+    if (++n >= 12) stopRing();
+  };
+  tick();
+  ringTimer = setInterval(tick, 700);
+}
+
+// لمس پیام = قطع صدا
+document.getElementById('toast').addEventListener('click', () => {
+  stopRing();
+  document.getElementById('toast').classList.remove('show');
+});
+
+// ---- افزودن به تقویم گوشی (.ics) ----
+function icsDate(ms) {
+  return new Date(ms).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+}
+function icsText(s) {
+  return s.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+}
+function downloadICS(task) {
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//kar-haye-man//FA',
+    'BEGIN:VEVENT',
+    'UID:' + task.id + '@kar-haye-man',
+    'DTSTAMP:' + icsDate(Date.now()),
+    'DTSTART:' + icsDate(task.due),
+    'DTEND:' + icsDate(task.due + 15 * 60000),
+    'SUMMARY:' + icsText(task.text),
+    'BEGIN:VALARM',
+    'ACTION:DISPLAY',
+    'DESCRIPTION:' + icsText(task.text),
+    'TRIGGER:PT0S',
+    'END:VALARM',
+    'END:VEVENT',
+    'END:VCALENDAR'
+  ];
+  const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'task.ics';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function notify(task) {
+  // داخل اپ، صدا و لرزش را خود اعلان سیستم انجام می‌دهد
+  if (isNative) { showToast('⏰ وقتشه: ' + task.text); return; }
+  showToast('⏰ وقتشه: ' + task.text + ' (برای قطع صدا اینجا رو لمس کن)');
+  startRing();
+  if ('Notification' in window && Notification.permission === 'granted') {
+    try { new Notification('یادآوری', { body: task.text }); } catch(e) {}
+  }
+}
+
+function checkReminders() {
+  const now = Date.now();
+  let changed = false;
+  tasks.forEach(t => {
+    if (t.due && !t.done && !t.notified && t.due <= now) {
+      t.notified = true;
+      changed = true;
+      notify(t);
+    }
+  });
+  if (changed) { save(); render(); }
+}
+
+setInterval(checkReminders, 15000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkReminders(); });
+
+// ---- رویدادها ----
+document.getElementById('form').addEventListener('submit', e => {
+  e.preventDefault();
+  const input = document.getElementById('input');
+  const text = input.value.trim();
+  if (!text) return;
+  const due = readDue();
+  const task = { id: Date.now().toString(), text, done: false, due, notified: false };
+  tasks.unshift(task);
+  scheduleNative(task);
+  input.value = '';
+  resetDue();
+  // اجازه نوتیفیکیشن فقط وقتی کاربر زمان گذاشته درخواست می‌شود
+  if (!isNative && due && 'Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+  save(); render(); checkReminders();
+});
+
+document.getElementById('list').addEventListener('click', e => {
+  const id = e.target.dataset.id;
+  if (!id) return;
+  if (e.target.type === 'checkbox') {
+    tasks = tasks.map(t => t.id === id ? {...t, done: e.target.checked} : t);
+    const ct = tasks.find(t => t.id === id);
+    if (ct.done) cancelNative(ct); else scheduleNative(ct);
+    save(); render();
+  } else if (e.target.classList.contains('cal')) {
+    const task = tasks.find(t => t.id === id);
+    if (task && task.due) downloadICS(task);
+  } else if (e.target.classList.contains('edit')) {
+    const task = tasks.find(t => t.id === id);
+    const newText = prompt('متن جدید:', task.text);
+    if (newText !== null && newText.trim() !== '') {
+      tasks = tasks.map(t => t.id === id ? {...t, text: newText.trim()} : t);
+      const et = tasks.find(t => t.id === id);
+      cancelNative(et).then(() => scheduleNative(et));
+      save(); render();
+    }
+  } else if (e.target.classList.contains('del')) {
+    const dt = tasks.find(t => t.id === id);
+    if (dt) cancelNative(dt);
+    tasks = tasks.filter(t => t.id !== id);
+    save(); render();
+  }
+});
+
+document.querySelectorAll('.filters button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filters button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    filter = btn.dataset.f;
+    render();
+  });
+});
+
+initPicker(); load(); render(); checkReminders();
+nativeSetup().then(() => tasks.forEach(scheduleNative));
+</script>
+</body>
+</html>
