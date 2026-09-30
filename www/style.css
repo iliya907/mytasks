@@ -1,165 +1,198 @@
+@font-face {
+    font-family: 'Vazirmatn';
+    src: url('fonts/Vazirmatn-Regular.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'Vazirmatn';
+    src: url('fonts/Vazirmatn-Medium.woff2') format('woff2');
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'Vazirmatn';
+    src: url('fonts/Vazirmatn-Bold.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* ---------- رنگ‌ها ---------- */
 :root {
     --bg: #FBF7EF; --surface: #FFFFFF; --ink: #26131D; --dim: #8A8171;
     --line: #E4DCC9; --accent: #c0562b; --done: #4d7a5e;
-    box-sizing: border-box; padding-top: env(safe-area-inset-top,0px); padding-bottom: env(safe-area-inset-bottom,0px);
+    --radius: 15px;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) { --bg: #1b1812; --surface: #252017; --ink: #efe9da; --dim: #9c9583; --line: #E4DCC9; --accent: #c0562b; --done: #ff1e00; }  
+    :root:not([data-theme="light"]) {
+        --bg: #1b1812; --surface: #252017; --ink: #efe9da; --dim: #9c9583;
+        --line: #3a3325; --accent: #d9683a; --done: #7fbe97;
+    }
 }
-:root[data-theme="dark"] { --bg: #1b1812; --surface: #ffad15; --ink: #efe9da; --dim: #9c9583; --line:#3a3325; --accent:#ff0000; --done:#7fbe97; }
-* { box-sizing: content-box;}
+:root[data-theme="dark"] {
+    --bg: #1b1812; --surface: #252017; --ink: #efe9da; --dim: #9c9583;
+    --line: #3a3325; --accent: #d9683a; --done: #7fbe97;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
 body {
     margin: 0;
-    background:var(--bg);
+    background: var(--bg);
     color: var(--ink);
-    font-family: 'Vazirmatn', sanas-serif;
+    font-family: 'Vazirmatn', system-ui, sans-serif;
+    line-height: 1.6;
 }
+button, input, select { font-family: inherit; }
+
 .part1 {
-    max-width: 520px; margin: 0 auto; padding: 3rem 1.3rem 4rem;
+    max-width: 520px;
+    margin: 0 auto;
+    padding: 2.5rem 1.2rem 4rem;
 }
-h1 {
-    font-size: 1.7rem; 
-    font-weight: 700;
-    margin: 0 0 .3rem;
-}
-.sub {
-    color: var(--dim);
-    font-size: .92rem;
-    margin-bottom: 1.8rem;
-}
+h1 { font-size: 1.7rem; font-weight: 700; margin: 0 0 .2rem; }
+.sub { color: var(--dim); font-size: .92rem; margin-bottom: 1.6rem; }
+
+/* ---------- فرم افزودن ---------- */
 form {
-    display: flex;
-    gap: .5rem;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: .6rem;
     margin-bottom: 1.4rem;
 }
 input[type=text] {
-    flex: 1;
-    padding: .75rem .9rem;
-    border-radius: 15px;
+    min-width: 0;
+    padding: .75rem 1rem;
+    border-radius: var(--radius);
     border: 1px solid var(--line);
     background: var(--surface);
     color: var(--ink);
-    font-family: inherit;
     font-size: 1rem;
-}
-input[type=text]:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 1px;
 }
 button.add {
     background: var(--accent);
     color: #fff;
     border: none;
-    border-radius: 15px;
-    padding: 0 1.1rem;
-    font-family: inherit;
+    border-radius: var(--radius);
+    padding: 0 1.4rem;
     font-size: 1rem;
+    font-weight: 500;
     cursor: pointer;
 }
-button.add:hover {opacity: .9;}
+button.add:hover { opacity: .9; }
+
+input[type=text]:focus-visible,
+.due-row select:focus-visible,
+button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* ---------- انتخاب زمان ---------- */
+.due-row {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: .5rem;
+}
+.due-label {
+    grid-column: 1 / -1;
+    color: var(--dim);
+    font-size: .85rem;
+}
+.due-row select {
+    width: 100%;
+    min-width: 0;
+    padding: .6rem .7rem;
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink);
+    font-size: .92rem;
+}
+.due-row .clear {
+    background: none;
+    border: 1px dashed var(--line);
+    border-radius: var(--radius);
+    color: var(--dim);
+    font-size: .88rem;
+    cursor: pointer;
+}
+.due-row .clear:hover { color: var(--accent); border-color: var(--accent); }
+
+/* ---------- فیلترها ---------- */
 .filters {
-    display: flex;
-    gap: 1.2rem;
-    margin-bottom: 1rem;
-    font-family: 'IBM Plex mono', monospace;
-    font-size: .82rem;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+    padding: 4px;
+    margin-bottom: 1.2rem;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
 }
 .filters button {
     background: none;
     border: none;
+    border-radius: 11px;
+    padding: .5rem 0;
     color: var(--dim);
+    font-size: .92rem;
     cursor: pointer;
-    padding: .2rem 0;
-    font-family: inherit;
-    font-size: inherit;
-    border-bottom: 2px solid transparent;
 }
 .filters button.active {
-    color: var(--ink);
-    border-color: var(--accent);
+    background: var(--accent);
+    color: #fff;
+    font-weight: 500;
 }
-ul {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    border-top: 1px solid var(--line); 
-}
+
+/* ---------- لیست کارها ---------- */
+ul { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
 li {
     display: flex;
     align-items: center;
-    gap: .7rem;
+    gap: .75rem;
     padding: .7rem 0;
     border-bottom: 1px solid var(--line);
 }
 li input[type=checkbox] {
-    width: 18px;
-    height: 18px;
-    accent-color: var(--done);
+    width: 20px;
+    height: 20px;
+    margin: 0;
     flex-shrink: 0;
+    accent-color: var(--done);
 }
-li .txt { 
-    flex: 1;
-}
-li.done .txt {
-    color: var(--dim);
-    text-decoration: line-through;
-}
-li .del {
-    background: none;
-    border: none;
-    color: var(--dim);
-    cursor: pointer;
-    font-size: 1.1rem;
-    padding: .2rem .4rem;
-}
-li .del:hover {
-    color: var(--accent);
-}
-.empty {
-    text-align: center;
-    color: var(--dim);
-    padding: 2.5rem 0;
-    font-size: .92rem;
-}
-.count { 
-    margin-top: 1rem;
-    font-family: 'IBM Plex Mono',monospace;
-    font-size: .78rem;
-    color: var(--dim);
-}
-/* ---- زمان‌بندی ---- */
-form { flex-wrap: wrap; }
-input[type=datetime-local] {
-    flex-basis: 100%;
-    padding: .6rem .9rem;
-    border-radius: 15px;
-    border: 1px solid var(--line);
-    background: var(--surface);
-    color: var(--ink);
-    font-family: inherit;
-    font-size: .92rem;
-}
-input[type=datetime-local]:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 1px;
-}
-li .due {
-    display: block;
-    margin-top: .15rem;
-    font-size: .8rem;
-    color: var(--dim);
-}
+li .txt { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+li.done .t { color: var(--dim); text-decoration: line-through; }
+li .due { display: block; margin-top: .1rem; font-size: .8rem; color: var(--dim); }
 li.overdue .due { color: var(--accent); font-weight: 500; }
-li.done .due { text-decoration: none; }
-li .edit {
-    background: none;
+
+li .actions { display: flex; gap: .1rem; flex-shrink: 0; }
+li .actions button {
+    width: 36px;
+    height: 36px;
+    display: grid;
+    place-items: center;
+    padding: 0;
     border: none;
+    border-radius: 10px;
+    background: none;
     color: var(--dim);
+    font-size: 1.05rem;
     cursor: pointer;
-    font-size: 1.1rem;
-    padding: .2rem .4rem;
 }
-li .edit:hover { color: var(--accent); }
+li .actions button:hover { background: var(--line); color: var(--ink); }
+li .actions .del:hover { color: var(--accent); }
+
+.empty { text-align: center; color: var(--dim); padding: 2.5rem 0; font-size: .92rem; }
+.count { margin-top: 1rem; font-size: .85rem; color: var(--dim); }
+
+/* ---------- پیام یادآوری ---------- */
 #toast {
     position: fixed;
     left: 50%;
@@ -169,57 +202,9 @@ li .edit:hover { color: var(--accent); }
     background: var(--ink);
     color: var(--bg);
     padding: .8rem 1.1rem;
-    border-radius: 15px;
+    border-radius: var(--radius);
     font-size: .95rem;
     display: none;
+    cursor: pointer;
 }
 #toast.show { display: block; }
-
-li .cal {
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-size: 1rem;
-    padding: .2rem .4rem;
-    opacity: .75;
-}
-li .cal:hover { opacity: 1; }
-#toast { cursor: pointer; }
-
-/* ---- انتخابگر تاریخ شمسی ---- */
-.due-row {
-    flex-basis: 100%;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: .4rem;
-}
-.due-label {
-    flex-basis: 100%;
-    color: var(--dim);
-    font-size: .85rem;
-}
-.due-row select {
-    flex: 1 1 4.5rem;
-    min-width: 0;
-    padding: .55rem .4rem;
-    border-radius: 15px;
-    border: 1px solid var(--line);
-    background: var(--surface);
-    color: var(--ink);
-    font-family: inherit;
-    font-size: .92rem;
-}
-.due-row select:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 1px;
-}
-.due-row .clear {
-    background: none;
-    border: none;
-    color: var(--dim);
-    cursor: pointer;
-    font-size: 1.1rem;
-    padding: .2rem .5rem;
-}
-.due-row .clear:hover { color: var(--accent); }

@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>کار های من</title>
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 </head>
 <body>
     <div class="part1">
@@ -22,7 +21,7 @@
                 <select id="dD" aria-label="روز"></select>
                 <select id="dH" aria-label="ساعت"></select>
                 <select id="dI" aria-label="دقیقه"></select>
-                <button type="button" id="dueClear" class="clear" aria-label="پاک کردن زمان" title="پاک کردن زمان">✕</button>
+                <button type="button" id="dueClear" class="clear" aria-label="پاک کردن زمان" title="پاک کردن زمان">پاک کردن</button>
             </div>
         </form>
 
@@ -149,11 +148,13 @@ const notifId = task => Number(String(task.id).slice(-9));
 async function nativeSetup() {
   if (!isNative) return;
   try { await LN.requestPermissions(); } catch(e) {}
-  // کانال با اهمیت بالا: اعلان با صدا و لرزش و به‌صورت پاپ‌آپ (فقط اندروید)
+  // کانال قدیمی (بدون صدای زنگ) پاک می‌شود و کانال جدید با صدای زنگ ساخته می‌شود
+  try { await LN.deleteChannel({ id: 'reminders' }); } catch(e) {}
   try {
     await LN.createChannel({
-      id: 'reminders', name: 'یادآوری کارها',
-      importance: 5, visibility: 1, vibration: true
+      id: 'alarm_reminders', name: 'زنگ یادآوری کارها',
+      importance: 5, visibility: 1, vibration: true,
+      sound: 'alarm.wav'
     });
   } catch(e) {}
 }
@@ -173,7 +174,7 @@ async function scheduleNative(task) {
       id: notifId(task),
       title: 'یادآوری',
       body: task.text,
-      channelId: 'reminders',
+      channelId: 'alarm_reminders',
       schedule: { at: new Date(task.due), allowWhileIdle: true }
     }] });
   } catch(e) {}
@@ -199,16 +200,17 @@ function render() {
       const dueHtml = t.due ? `<small class="due">${overdue ? 'گذشته: ' : '⏰ '}${formatDue(t.due)}</small>` : '';
       li.innerHTML = `
         <input type="checkbox" ${t.done ? 'checked' : ''} data-id="${t.id}">
-        <span class="txt">${esc(t.text)}${dueHtml}</span>
-        ${t.due ? `<button class="cal" data-id="${t.id}" aria-label="افزودن به تقویم گوشی" title="افزودن به تقویم">📅</button>` : ''}
-        <button class="edit" data-id="${t.id}" aria-label="ویرایش">✎</button>
-        <button class="del" data-id="${t.id}" aria-label="حذف">✕</button>
+        <span class="txt"><span class="t">${esc(t.text)}</span>${dueHtml}</span>
+        <span class="actions">
+          <button class="edit" data-id="${t.id}" aria-label="ویرایش">✎</button>
+          <button class="del" data-id="${t.id}" aria-label="حذف">✕</button>
+        </span>
       `;
       list.appendChild(li);
     });
   }
   const doneCount = tasks.filter(t => t.done).length;
-  document.getElementById('count').textContent = `${doneCount} از ${tasks.length} کار انجام شده`;
+  document.getElementById('count').textContent = `${faNum(doneCount)} از ${faNum(tasks.length)} کار انجام شده`;
 }
 
 // ---- یادآوری ----
@@ -275,43 +277,6 @@ document.getElementById('toast').addEventListener('click', () => {
   document.getElementById('toast').classList.remove('show');
 });
 
-// ---- افزودن به تقویم گوشی (.ics) ----
-function icsDate(ms) {
-  return new Date(ms).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
-}
-function icsText(s) {
-  return s.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
-}
-function downloadICS(task) {
-  const lines = [
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    'PRODID:-//kar-haye-man//FA',
-    'BEGIN:VEVENT',
-    'UID:' + task.id + '@kar-haye-man',
-    'DTSTAMP:' + icsDate(Date.now()),
-    'DTSTART:' + icsDate(task.due),
-    'DTEND:' + icsDate(task.due + 15 * 60000),
-    'SUMMARY:' + icsText(task.text),
-    'BEGIN:VALARM',
-    'ACTION:DISPLAY',
-    'DESCRIPTION:' + icsText(task.text),
-    'TRIGGER:PT0S',
-    'END:VALARM',
-    'END:VEVENT',
-    'END:VCALENDAR'
-  ];
-  const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'task.ics';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
 function notify(task) {
   // داخل اپ، صدا و لرزش را خود اعلان سیستم انجام می‌دهد
   if (isNative) { showToast('⏰ وقتشه: ' + task.text); return; }
@@ -365,9 +330,6 @@ document.getElementById('list').addEventListener('click', e => {
     const ct = tasks.find(t => t.id === id);
     if (ct.done) cancelNative(ct); else scheduleNative(ct);
     save(); render();
-  } else if (e.target.classList.contains('cal')) {
-    const task = tasks.find(t => t.id === id);
-    if (task && task.due) downloadICS(task);
   } else if (e.target.classList.contains('edit')) {
     const task = tasks.find(t => t.id === id);
     const newText = prompt('متن جدید:', task.text);

@@ -6,7 +6,8 @@
     "@capacitor/android": "latest",
     "@capacitor/cli": "latest",
     "@capacitor/core": "latest",
-    "@capacitor/local-notifications": "latest"
+    "@capacitor/local-notifications": "latest",
+    "vazirmatn": "latest"
   },
   "devDependencies": {
     "@capacitor/assets": "latest"
